@@ -1,21 +1,21 @@
-from typing import TypedDict
+from typing import TypedDict, Annotated
 
 from fastapi import Depends, Request, Header, HTTPException, status
-
-from app.services.task_storage import InMemoryTaskStorage
+from sqlalchemy.orm import Session
+from app.services.task_storage import SqlAlchemyTaskStorage
 from app.usecases.task_service import TaskUseCase
-
+from app.db.session import get_db
 
 class RequestContext(TypedDict):
     request_id: str
     process_time: float
 
 
-task_storage = InMemoryTaskStorage()
 
+DBDep = Annotated[Session, Depends(get_db)]
 
-def get_task_use_case() -> TaskUseCase:
-    return TaskUseCase(storage=task_storage)
+def get_task_use_case(db: DBDep) -> TaskUseCase:
+    return TaskUseCase(storage=SqlAlchemyTaskStorage(db=db))
 
 
 def verify_api_key(x_api_key: str = Header(...)) -> str:

@@ -1,51 +1,52 @@
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models.task import Task
 from app.schemas.task import TaskCreate, TaskResponse, TaskStatus
 
 
-class InMemoryTaskStorage:
-    def __init__(self) -> None:
-        self._task: list[TaskResponse] = [
-            TaskResponse(
-                id=1,
-                title="TestTest",
-                description="TestTestTestTestTestTestTestTest",
-                priority=2,
-                status=TaskStatus.TODO
-            ),
-            TaskResponse(
-                id=2,
-                title="2222",
-                description="22222222",
-                priority=2,
-                status=TaskStatus.IN_PROGRESS
-            ),
-        ]
-        self._next_id = 3
-
-    def list_tasks(self) -> list[TaskResponse]:
-        return self._task
+class SqlAlchemyTaskStorage:
+    def __init__(self, db: Session):
+        self._db = db
+    def _to_response(self, task: Task) -> TaskResponse:
+        return TaskResponse(
+            id=task.id,
+            title=task.title,
+            description=task.description,
+            priority=task.priority,
+            status=task.status,
+        )
+    def list_tasks(self) ->list[TaskResponse]:
+        tasks = self._db.scalars(select(Task).order_by(Task.id)).all()
+        return [self._to_response(task) for task in tasks]
 
     def get_task(self, task_id: int) -> TaskResponse | None:
-        return next((task for task in self._task if task.id == task_id), None)
+        task = self._db.get(Task, task_id)
+        if task is None:
+            return None
+        return self._to_response(task)
 
     def create_task(self, data: TaskCreate) -> TaskResponse:
-        task = TaskResponse(
-                id=self._next_id,
-                title=data.title,
-                description=data.description,
-                priority=data.priority,
-                status=TaskStatus.TODO,
-            )
-        self._task.append(task)
-        self._next_id += 1
-        return task
+        task = Task(
+            title = data.title,
+            description = data.description,
+            priority=data.priority,
+            status=TaskStatus.TODO,
+        )
 
-    def update_status(self, task_id: int, status: TaskStatus) -> TaskResponse:
-        task = self.get_task(task_id)
+        self._db.add(task)
+        self._db.commit()
+        self._db.refresh(task)
 
+        return self._to_response(task)
+
+    def update_status(self, task_id: int, status: TaskStatus) -> TaskResponse | None:
+        task = self._db.get(Task, task_id)
         if task is None:
             return None
 
-        updated_task = task.model_copy(update={"status": status})
-        index = self._task.index(task)
-        self._task[index] = updated_task
-        return updated_task
+        task.status = status
+        self._db.commit()
+        self._db.refresh(task)
+
+        return self._to_response(task)

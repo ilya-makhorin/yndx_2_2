@@ -1,11 +1,11 @@
 from fastapi import HTTPException, status
 
 from app.schemas.task import TaskResponse, TaskStatus, TaskCreate, TaskListResponse, TaskUpdate
-from app.services.task_storage import InMemoryTaskStorage
+from app.services.task_storage import SqlAlchemyTaskStorage
 
 
 class TaskUseCase:
-    def __init__(self, storage: InMemoryTaskStorage) -> None:
+    def __init__(self, storage: SqlAlchemyTaskStorage) -> None:
         self.storage = storage
 
     def list_tasks(self) -> TaskListResponse:
